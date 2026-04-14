@@ -141,6 +141,50 @@ class AuditLogger:
         self.logger.info(f"{status} Operación criptográfica: {operation}")
         self._insert_audit_record(user_id, f"CRYPTO:{operation}", success)
 
+    def log_key_usage(
+        self,
+        used_by: str,
+        key_name: str,
+        version: int,
+        action: str,
+        details: str = ""
+        ):
+        message = f"🔑 KEY_USE usuario={used_by} clave={key_name} v{version} acción={action}"
+        if details:
+            message += f" - {details}"
+
+        self.logger.info(message)
+        self._insert_audit_record(
+            used_by,
+            f"KEY_USE:{key_name}:v{version}:{action}",
+            True,
+            details
+        )
+
+    def log_certificate_event(
+        self,
+        actor_id: str,
+        target_user_id: str,
+        certificate_id: str,
+        event: str,
+        details: str = ""
+    ):
+        message = (
+            f"📜 CERT {event} usuario={target_user_id} "
+            f"certificado={certificate_id}"
+        )
+        if details:
+            message += f" - {details}"
+
+        self.logger.info(message)
+        self._insert_audit_record(
+            actor_id,
+            f"CERT:{event}:{target_user_id}",
+            True,
+            f"certificate_id={certificate_id}; {details}"
+        )
+        
+
     def _insert_audit_record(
         self,
         user_id: str,
@@ -196,3 +240,5 @@ class AuditLogger:
 
 # Instancia global del logger
 audit_logger = AuditLogger()
+
+

@@ -29,6 +29,16 @@ crypto_manager = CryptoManager()
 current_user = None
 current_role = None
 
+def require_primary_admin_cli() -> bool:
+    if not current_user:
+        click.secho("❌ Error: Debes iniciar sesión primero", fg="red")
+        return False
+
+    if not user_manager.is_primary_admin(current_user):
+        click.secho("❌ Error: Solo el admin principal puede realizar esta acción", fg="red")
+        return False
+
+    return True
 
 @click.group()
 def cli():
@@ -208,7 +218,140 @@ def decrypt_data(input_file: str, output_file: Optional[str]):
         audit_logger.log_error(current_user, "decrypt_data", "DecryptionError", str(e))
         click.secho(f"❌ Error: {e}", fg="red")
 
+@cli.command("list-raw-users")
+def list_raw_users():
+    """Lista usuarios sin cifrar (solo admin principal)."""
+    if not require_primary_admin_cli():
+        return
 
+    try:
+        users = user_manager.list_raw_users(current_user)
+
+        if not users:
+            click.secho("No hay usuarios registrados", fg="yellow")
+            return
+
+        click.echo("\n" + "=" * 100)
+        click.echo(f"{'ID Usuario':<20} {'Rol':<15} {'Primary Admin':<15} {'Creado':<25} {'Último Login':<25}")
+        click.echo("=" * 100)
+
+        for user_id, rol, is_primary_admin, created_at, last_login in users:
+            primary_str = "Sí" if is_primary_admin else "No"
+            last_login_str = last_login or "Nunca"
+            click.echo(f"{user_id:<20} {rol:<15} {primary_str:<15} {created_at:<25} {last_login_str:<25}")
+
+        click.echo("=" * 100)
+
+    except Exception as e:
+        click.secho(f"❌ Error: {e}", fg="red")
+
+@cli.command("assign-certificate")
+@click.option("--user-id", prompt="Usuario destino", help="Usuario al que se asignará el certificado")
+@click.option("--certificate-pem", prompt="Contenido o identificador del certificado", help="Certificado o identificador")
+@click.option("--expires-at", default=None, help="Fecha de expiración (YYYY-MM-DD)")
+def assign_certificate(user_id: str, certificate_pem: str, expires_at: str):
+    """Asigna un certificado a un usuario (solo admin principal)."""
+    if not require_primary_admin_cli():
+        return
+
+    try:
+        cert_id = user_manager.assign_certificate(
+            user_id=user_id,
+            certificate_pem=certificate_pem,
+            assigned_by=current_user,
+            expires_at=expires_at,
+        )
+        click.secho(f"✅ Certificado asignado correctamente: {cert_id}", fg="green")
+
+    except SecurityException as e:
+        click.secho(f"❌ Error: {e}", fg="red")
+
+@cli.command("revoke-certificate")
+@click.option("--user-id", prompt="Usuario objetivo", help="Usuario al que se revocará el certificado")
+def revoke_certificate(user_id: str):
+    """Revoca el certificado activo de un usuario (solo admin principal)."""
+    if not require_primary_admin_cli():
+        return
+
+    try:
+        user_manager.revoke_certificate(user_id=user_id, revoked_by=current_user)
+        click.secho(f"✅ Certificado revocado para '{user_id}'", fg="green")
+
+    except SecurityException as e:
+        click.secho(f"❌ Error: {e}", fg="red")
+
+
+@cli.command("show-certificate")
+@click.option("--user-id", prompt="Usuario", help="Usuario a consultar")
+def show_certificate(user_id: str):
+    """Muestra el certificado activo de un usuario."""
+    if not current_user:
+        click.secho("❌ Error: Debes iniciar sesión primero", fg="red")
+        return
+
+    try:
+        cert = user_manager.get_active_certificate(user_id)
+
+        if not cert:
+            click.secho("No hay certificado activo para ese usuario", fg="yellow")
+            return
+
+        click.echo("\n📜 Certificado activo")
+        click.echo(f"ID: {cert[0]}")
+        click.echo(f"Fingerprint: {cert[1]}")
+        click.echo(f"Estado: {cert[2]}")
+        click.echo(f"Asignado en: {cert[3]}")
+        click.echo(f"Expira en: {cert[4]}")
+
+    except Exception as e:
+        click.secho(f"❌ Error: {e}", fg="red")
+
+@cli.command("rotate-key")
+@click.option("--key-name", prompt="Nombre de la clave", help="Ej. basica o admin")
+def rotate_key(key_name: str):
+    """Rota una clave activa (solo admin principal)."""
+    if not require_primary_admin_cli():
+        return
+
+    try:
+        version = crypto_manager.rotate_key(key_name, rotated_by=current_user)
+        click.secho(
+            f"✅ Clave '{key_name}' rotada correctamente. Nueva versión: v{version}",
+            fg="green",
+        )
+
+    except Exception as e:
+        click.secho(f"❌ Error: {e}", fg="red")
+
+@cli.command("key-usage-log")
+@click.option("--limit", type=int, default=50, help="Número de registros")
+def key_usage_log(limit: int):
+    """Muestra registros de uso de claves (solo admin principal)."""
+    if not require_primary_admin_cli():
+        return
+
+    try:
+        records = audit_logger.get_audit_trail(limit=limit)
+
+        filtered = [r for r in records if "KEY_USE:" in str(r[2])]
+
+        if not filtered:
+            click.secho("No hay registros de uso de claves", fg="yellow")
+            return
+
+        click.echo("\n" + "=" * 120)
+        click.echo(f"{'Usuario':<15} {'Acción':<40} {'Resultado':<10} {'Detalles':<30} {'Fecha':<20}")
+        click.echo("=" * 120)
+
+        for record in filtered:
+            user, action, result, details, fecha = record[1], record[2], record[3], record[4], record[5]
+            details_short = (details or "")[:30]
+            click.echo(f"{user:<15} {action:<40} {result:<10} {details_short:<30} {fecha:<20}")
+
+        click.echo("=" * 120)
+
+    except Exception as e:
+        click.secho(f"❌ Error: {e}", fg="red")
 # ====== COMANDOS DE AUDITORÍA ======
 
 

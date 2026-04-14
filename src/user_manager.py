@@ -7,6 +7,8 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, List
 from contextlib import contextmanager
+import hashlib
+import uuid
 
 import bcrypt
 
@@ -29,6 +31,7 @@ from exceptions import (
     UserAlreadyExistsError,
     PermissionDeniedError,
     InvalidDataError,
+    CertificateError,
 )
 from audit_logger import audit_logger
 
@@ -169,11 +172,37 @@ class UserManager:
                     )
                     """
                 )
-
+                c.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_certificates (
+                        certificate_id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        certificate_pem TEXT,
+                        fingerprint TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'activo',
+                        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP,
+                        assigned_by TEXT NOT NULL,
+                        revoked_at TIMESTAMP,
+                        revoked_by TEXT,
+                        FOREIGN KEY (user_id) REFERENCES usuarios(id_usuario)
+                    )
+                    """)
+                
+                self._run_schema_migrations(c)
                 conn.commit()
         except sqlite3.Error as e:
             audit_logger.log_error("SISTEMA", "init_database", "DBError", str(e))
             raise
+
+    def _ensure_column(self, cursor, table_name: str, column_name: str, definition: str):
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = {row[1] for row in cursor.fetchall()}
+        if column_name not in columns:
+            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+
+    def _run_schema_migrations(self, cursor):
+        self._ensure_column(cursor, "usuarios", "is_primary_admin", "INTEGER DEFAULT 0")
 
     def create_user(
         self,
@@ -181,7 +210,9 @@ class UserManager:
         password: str,
         rol: str,
         created_by: str = "SISTEMA",
+        is_primary_admin: bool = False,
     ) -> bool:
+        
         """
         Crea un nuevo usuario.
         
@@ -212,7 +243,7 @@ class UserManager:
         # Validar entrada
         if not DataValidator.validate_user_id(user_id):
             raise InvalidDataError(
-                f"ID de usuario inválido. Usa 3-50 caracteres alfanuméricos, guiones o guiones bajos"
+                "ID de usuario inválido. Usa 3-50 caracteres alfanuméricos, guiones o guiones bajos"
             )
 
         if rol not in ROLES:
@@ -226,16 +257,24 @@ class UserManager:
             )
             raise WeakPasswordError(message)
 
-        # Verificar si usuario ya existe
         try:
             with self._get_connection() as conn:
                 c = conn.cursor()
+
+                # Verificar si usuario ya existe
                 c.execute("SELECT id_usuario FROM usuarios WHERE id_usuario = ?", (user_id,))
                 if c.fetchone():
                     audit_logger.log_error(
                         created_by, "create_user", "UserExists", f"Usuario {user_id} ya existe"
                     )
                     raise UserAlreadyExistsError(f"El usuario '{user_id}' ya existe")
+
+                # Validaciones de admin principal
+                if is_primary_admin and created_by != "SISTEMA":
+                    self.require_primary_admin(created_by, "create_primary_admin")
+
+                if rol == "admin" and created_by != "SISTEMA":
+                    self.require_primary_admin(created_by, "create_admin")
 
                 # Hash de contraseña
                 salt = bcrypt.gensalt(rounds=12)
@@ -244,10 +283,10 @@ class UserManager:
                 # Insertar usuario
                 c.execute(
                     """
-                    INSERT INTO usuarios (id_usuario, password_hash, rol)
-                    VALUES (?, ?, ?)
+                    INSERT INTO usuarios (id_usuario, password_hash, rol, is_primary_admin)
+                    VALUES (?, ?, ?, ?)
                     """,
-                    (user_id, hashed, rol),
+                    (user_id, hashed, rol, 1 if is_primary_admin else 0),
                 )
 
                 conn.commit()
@@ -258,6 +297,119 @@ class UserManager:
         except sqlite3.Error as e:
             audit_logger.log_error(created_by, "create_user", "DBError", str(e))
             raise
+
+    def is_primary_admin(self, user_id: str) -> bool:
+        try:
+            with self._get_connection() as conn:
+                c = conn.cursor()
+                c.execute(
+                    "SELECT is_primary_admin FROM usuarios WHERE id_usuario = ?",
+                    (user_id,)
+                )
+                result = c.fetchone()
+                return bool(result and result[0] == 1)
+        except sqlite3.Error:
+            return False
+
+    def require_primary_admin(self, user_id: str, action: str):
+        if not self.is_primary_admin(user_id):
+            raise PermissionDeniedError(
+                f"Solo el admin principal puede realizar la acción: {action}"
+            )
+        
+    def assign_certificate(
+        self,
+        user_id: str,
+        certificate_pem: str,
+        assigned_by: str,
+        expires_at: str = None,
+    ) -> str:
+        self.require_primary_admin(assigned_by, "assign_certificate")
+
+        certificate_id = f"CERT-{user_id}-{uuid.uuid4().hex[:8]}"
+        fingerprint = hashlib.sha256(certificate_pem.encode()).hexdigest()
+
+        with self._get_connection() as conn:
+            c = conn.cursor()
+
+            c.execute("SELECT id_usuario FROM usuarios WHERE id_usuario = ?", (user_id,))
+            if not c.fetchone():
+                raise UserNotFoundError(f"Usuario '{user_id}' no existe")
+
+            c.execute(
+                """
+                INSERT INTO user_certificates
+                (certificate_id, user_id, certificate_pem, fingerprint, status, expires_at, assigned_by)
+                VALUES (?, ?, ?, ?, 'activo', ?, ?)
+                """,
+                (certificate_id, user_id, certificate_pem, fingerprint, expires_at, assigned_by)
+            )
+            conn.commit()
+
+        audit_logger.log_certificate_event(
+            assigned_by,
+            user_id,
+            certificate_id,
+            "assign",
+            f"fingerprint={fingerprint}"
+        )
+        return certificate_id
+    
+    def get_active_certificate(self, user_id: str):
+        with self._get_connection() as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                SELECT certificate_id, fingerprint, status, assigned_at, expires_at
+                FROM user_certificates
+                WHERE user_id = ? AND status = 'activo'
+                ORDER BY assigned_at DESC
+                LIMIT 1
+                """,
+                (user_id,)
+            )
+            return c.fetchone()
+        
+    def revoke_certificate(self, user_id: str, revoked_by: str) -> bool:
+        self.require_primary_admin(revoked_by, "revoke_certificate")
+
+        with self._get_connection() as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                UPDATE user_certificates
+                SET status = 'revocado',
+                    revoked_at = CURRENT_TIMESTAMP,
+                    revoked_by = ?
+                WHERE user_id = ? AND status = 'activo'
+                """,
+                (revoked_by, user_id)
+            )
+            conn.commit()
+
+            if c.rowcount == 0:
+                raise CertificateError(f"El usuario '{user_id}' no tiene certificado activo")
+
+        audit_logger.log_certificate_event(
+            revoked_by,
+            user_id,
+            "N/A",
+            "revoke",
+            "Certificado activo revocado"
+        )
+        return True
+    
+    def list_raw_users(self, requested_by: str):
+        self.require_primary_admin(requested_by, "read_raw_users")
+
+        with self._get_connection() as conn:
+            c = conn.cursor()
+            c.execute("""
+                SELECT id_usuario, rol, is_primary_admin, created_at, last_login
+                FROM usuarios
+                ORDER BY created_at DESC
+            """)
+            return c.fetchall()
 
     def authenticate(self, user_id: str, password: str) -> Tuple[bool, str]:
         """

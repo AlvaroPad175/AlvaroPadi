@@ -61,6 +61,19 @@ ROLES = {
     "analista": {"level": 2, "permissions": ["read_level1"]},
     "publico": {"level": 1, "permissions": []},
 }
+PRIMARY_ADMIN_USER_ID = os.getenv("PRIMARY_ADMIN_USER_ID", "admin_master")
+
+PRIMARY_ADMIN_ONLY_PERMISSIONS = {
+    "read_raw_users",
+    "assign_certificates",
+    "revoke_certificates",
+    "manage_keys",
+    "rotate_keys",
+    "view_key_usage",
+}
+
+CERTIFICATE_REQUIRED_ROLES = {"admin", "analista"}
+DEFAULT_CERTIFICATE_STATUS = "pendiente"
 
 # ====== COLUMNAS DE DATOS POR NIVEL ======
 LEVEL1_COLS = ["Edad", "Tiempo Estancia Determinado"]
@@ -71,3 +84,6 @@ PUBLIC_COLS = ["ID Usuario", "Fecha de Ingreso", "País Origen"]
 CLI_TIMEOUT_MINUTES = 30
 
 print("✅ Configuración cargada correctamente")
+
+
+

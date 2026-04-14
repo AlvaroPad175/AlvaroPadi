@@ -75,66 +75,6 @@ class KeyDerivationManager:
             )
             raise ConfigurationError(f"Error derivando clave: {e}")
 
-    @staticmethod
-    def store_key_metadata(key_name: str, salt: bytes, iterations: int = KEY_DERIVATION_ITERATIONS):
-        """
-        Almacena metadatos de la clave en la BD para recuperación.
-        
-        Args:
-            key_name: Nombre identificador de la clave (ej: "basica", "admin")
-            salt: Salt usado en la derivación
-            iterations: Iteraciones PBKDF2 usadas
-        """
-        try:
-            conn = sqlite3.connect(DATABASE_PATH)
-            c = conn.cursor()
-
-            # Crear tabla si no existe
-            c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS key_metadata (
-                    key_name TEXT PRIMARY KEY,
-                    salt BLOB NOT NULL,
-                    iterations INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-
-            # Insertar o actualizar
-            c.execute(
-                "INSERT OR REPLACE INTO key_metadata (key_name, salt, iterations) VALUES (?, ?, ?)",
-                (key_name, salt, iterations),
-            )
-            conn.commit()
-            conn.close()
-        except sqlite3.Error as e:
-            audit_logger.log_error("SISTEMA", "store_key_metadata", "DBError", str(e))
-            raise ConfigurationError(f"Error almacenando metadatos de clave: {e}")
-
-    @staticmethod
-    def retrieve_key_metadata(key_name: str) -> Optional[Tuple[bytes, int]]:
-        """
-        Recupera metadatos de clave almacenados.
-        
-        Args:
-            key_name: Nombre de la clave
-            
-        Returns:
-            Tupla (salt, iterations) o None si no existe
-        """
-        try:
-            conn = sqlite3.connect(DATABASE_PATH)
-            c = conn.cursor()
-            c.execute("SELECT salt, iterations FROM key_metadata WHERE key_name = ?", (key_name,))
-            result = c.fetchone()
-            conn.close()
-            return result
-        except sqlite3.Error as e:
-            audit_logger.log_error("SISTEMA", "retrieve_key_metadata", "DBError", str(e))
-            return None
-
-
 class CryptoManager:
     """
     Gestión de cifrado/descifrado AES-GCM con derivación PBKDF2.
@@ -155,7 +95,29 @@ class CryptoManager:
             )
         self.master_password = master_password
         self.key_derivation = KeyDerivationManager()
+        self._init_key_versions_table()
         audit_logger.log_encryption_operation("init_crypto_manager", success=True)
+
+    def _init_key_versions_table(self):
+        conn = sqlite3.connect(DATABASE_PATH)
+        c = conn.cursor()
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS key_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key_name TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            salt BLOB NOT NULL,
+            iterations INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_by TEXT NOT NULL DEFAULT 'SISTEMA',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_used_at TIMESTAMP,
+            last_used_by TEXT,
+            UNIQUE(key_name, version)
+        )
+        """)
+        conn.commit()
+        conn.close()
 
     def get_or_create_key(self, key_name: str, key_size: int = KEY_SIZE) -> bytes:
         """
@@ -276,8 +238,8 @@ class CryptoManager:
             df_enc = df.copy()
 
             # Obtener claves
-            key_basica = self.get_or_create_key("basica")
-            key_admin = self.get_or_create_key("admin") if use_admin_key else key_basica
+            key_basica = self.get_or_create_key("basica", requested_by="SISTEMA")
+            key_admin = self.get_or_create_key("admin", requested_by="SISTEMA") if use_admin_key else key_basica
 
             # Encriptar nivel 1
             for col in level1_cols:
@@ -313,8 +275,8 @@ class CryptoManager:
             df_dec = df.copy()
 
             # Obtener claves
-            key_basica = self.get_or_create_key("basica")
-            key_admin = self.get_or_create_key("admin") if use_admin_key else key_basica
+            key_basica = self.get_or_create_key("basica", requested_by="SISTEMA")
+            key_admin = self.get_or_create_key("admin", requested_by="SISTEMA") if use_admin_key else key_basica
 
             # Desencriptar nivel 1
             if level1_cols:
@@ -334,3 +296,97 @@ class CryptoManager:
         except Exception as e:
             audit_logger.log_error("SISTEMA", "decrypt_dataframe", "DecryptionError", str(e))
             raise DecryptionError(f"Error desencriptando DataFrame: {e}")
+    
+    def _get_active_key_record(self, key_name: str):
+        conn = sqlite3.connect(DATABASE_PATH)
+        c = conn.cursor()
+        c.execute("""
+            SELECT version, salt, iterations
+            FROM key_versions
+            WHERE key_name = ? AND status = 'active'
+            ORDER BY version DESC
+            LIMIT 1
+        """, (key_name,))
+        row = c.fetchone()
+        conn.close()
+        return row
+
+    def _touch_key_usage(self, key_name: str, version: int, used_by: str):
+        conn = sqlite3.connect(DATABASE_PATH)
+        c = conn.cursor()
+        c.execute("""
+            UPDATE key_versions
+            SET last_used_at = CURRENT_TIMESTAMP,
+                last_used_by = ?
+            WHERE key_name = ? AND version = ?
+        """, (used_by, key_name, version))
+        conn.commit()
+        conn.close()
+
+    def get_or_create_key(self, key_name: str, key_size: int = KEY_SIZE, requested_by: str = "SISTEMA") -> bytes:
+        record = self._get_active_key_record(key_name)
+
+        if record:
+            version, salt, iterations = record
+            key, _ = self.key_derivation.derive_key(
+                self.master_password,
+                salt=salt,
+                key_size=key_size,
+                iterations=iterations
+            )
+            audit_logger.log_key_usage(requested_by, key_name, version, "load_active")
+            self._touch_key_usage(key_name, version, requested_by)
+            return key
+
+        key, salt = self.key_derivation.derive_key(
+            self.master_password,
+            key_size=key_size
+        )
+
+        conn = sqlite3.connect(DATABASE_PATH)
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO key_versions
+            (key_name, version, salt, iterations, status, created_by)
+            VALUES (?, 1, ?, ?, 'active', ?)
+        """, (key_name, salt, KEY_DERIVATION_ITERATIONS, requested_by))
+        conn.commit()
+        conn.close()
+
+        audit_logger.log_key_usage(requested_by, key_name, 1, "create_active")
+        return key
+
+    def rotate_key(self, key_name: str, rotated_by: str = "SISTEMA") -> int:
+        conn = sqlite3.connect(DATABASE_PATH)
+        c = conn.cursor()
+
+        c.execute("""
+            SELECT COALESCE(MAX(version), 0)
+            FROM key_versions
+            WHERE key_name = ?
+        """, (key_name,))
+        current_max = c.fetchone()[0]
+        new_version = current_max + 1
+
+        key, salt = self.key_derivation.derive_key(
+            self.master_password,
+            key_size=KEY_SIZE
+        )
+
+        c.execute("""
+            UPDATE key_versions
+            SET status = 'inactive'
+            WHERE key_name = ? AND status = 'active'
+        """, (key_name,))
+
+        c.execute("""
+            INSERT INTO key_versions
+            (key_name, version, salt, iterations, status, created_by)
+            VALUES (?, ?, ?, ?, 'active', ?)
+        """, (key_name, new_version, salt, KEY_DERIVATION_ITERATIONS, rotated_by))
+
+        conn.commit()
+        conn.close()
+
+        audit_logger.log_key_usage(rotated_by, key_name, new_version, "rotate")
+        return new_version

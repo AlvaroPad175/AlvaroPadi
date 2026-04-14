@@ -56,3 +56,11 @@ class ConfigurationError(SecurityException):
 class RateLimitExceededError(SecurityException):
     """Se ha excedido el límite de intentos."""
     pass
+
+class CertificateError(SecurityException):
+    """Error relacionado con certificados de usuario."""
+    pass
+
+class KeyManagementError(SecurityException):
+    """Error relacionado con gestión y rotación de claves."""
+    pass
