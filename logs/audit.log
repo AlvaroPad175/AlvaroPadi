@@ -1,0 +1,27 @@
+2026-04-14 01:30:04 - AuditLogger - INFO - ✅ Operación criptográfica: init_crypto_manager
+2026-04-14 01:49:38 - AuditLogger - INFO - ✅ Operación criptográfica: init_crypto_manager
+2026-04-14 04:21:39 - AuditLogger - INFO - ✅ Operación criptográfica: init_crypto_manager
+2026-04-14 04:23:10 - AuditLogger - INFO - 🆕 Nuevo usuario creado por SISTEMA: admin_master (rol: admin)
+2026-04-14 04:23:10 - AuditLogger - ERROR - ❌ ERROR [DBError] durante retrieve_key_metadata: no such table: key_metadata
+2026-04-14 04:23:10 - AuditLogger - INFO - ✅ Operación criptográfica: create_key:basica
+2026-04-14 04:23:10 - AuditLogger - INFO - ✅ Operación criptográfica: create_key:admin
+2026-04-14 04:26:03 - AuditLogger - INFO - ✅ Operación criptográfica: init_crypto_manager
+2026-04-14 04:27:08 - AuditLogger - ERROR - ❌ ERROR [UserExists] durante create_user: Usuario admin_master ya existe
+2026-04-14 04:27:08 - AuditLogger - ERROR - ❌ ERROR [UserExists] durante create_user: Usuario admin_master ya existe
+2026-04-14 04:27:08 - AuditLogger - INFO - 🔑 KEY_USE usuario=SISTEMA clave=basica v1 acción=create_active
+2026-04-14 04:27:08 - AuditLogger - INFO - 🔑 KEY_USE usuario=SISTEMA clave=admin v1 acción=create_active
+2026-04-14 04:27:08 - AuditLogger - INFO - 🔑 KEY_USE usuario=SISTEMA clave=admin v1 acción=load_active
+2026-04-14 04:35:17 - AuditLogger - INFO - ✅ Operación criptográfica: init_crypto_manager
+2026-04-14 04:36:25 - AuditLogger - ERROR - ❌ ERROR [WeakPassword] durante create_user: Usuario admin_master: Contraseña débil: Mínimo 12 caracteres
+2026-04-14 04:37:03 - AuditLogger - ERROR - ❌ ERROR [DBError] durante create_user: Cannot operate on a closed database.
+2026-04-14 04:42:08 - AuditLogger - INFO - ✅ Operación criptográfica: init_crypto_manager
+2026-04-14 04:42:44 - AuditLogger - INFO - 🆕 Nuevo usuario creado por SISTEMA: admin_master (rol: admin)
+2026-04-14 04:43:00 - AuditLogger - ERROR - ❌ ERROR [UserExists] durante create_user: Usuario admin_master ya existe
+2026-04-14 04:43:31 - AuditLogger - INFO - 🔑 KEY_USE usuario=SISTEMA clave=basica v1 acción=create_active
+2026-04-14 04:43:32 - AuditLogger - INFO - 🔑 KEY_USE usuario=SISTEMA clave=admin v1 acción=create_active
+2026-04-14 04:46:23 - AuditLogger - INFO - 🔑 KEY_USE usuario=SISTEMA clave=admin v1 acción=load_active
+2026-04-14 05:15:37 - AuditLogger - INFO - ✅ Operación criptográfica: init_crypto_manager
+2026-04-14 05:20:06 - AuditLogger - INFO - 🆕 Nuevo usuario creado por SISTEMA: usuario_prueba (rol: analista)
+2026-04-14 05:20:18 - AuditLogger - INFO - 📜 CERT assign usuario=usuario_prueba certificado=CERT-usuario_prueba-7c3f0755 - fingerprint=038acdb7d8acd6dda66315096289cb27590e24a190c337c3c47bd0aa92c99cdf
+2026-04-14 05:20:39 - AuditLogger - INFO - 📜 CERT revoke usuario=usuario_prueba certificado=N/A - Certificado activo revocado
+2026-04-14 07:07:26 - AuditLogger - INFO - 📜 CERT assign usuario=usuario_prueba certificado=CERT-usuario_prueba-3c69b49a - fingerprint=038acdb7d8acd6dda66315096289cb27590e24a190c337c3c47bd0aa92c99cdf
