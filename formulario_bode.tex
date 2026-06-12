@@ -1,0 +1,391 @@
+\documentclass[11pt]{article}
+
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{multicol}
+
+\geometry{margin=1.5cm}
+
+\newcommand{\jw}{j\omega}
+\newcommand{\degr}{^\circ}
+
+\begin{document}
+
+\begin{center}
+{\Large \textbf{Formulario: Respuesta en Frecuencia y Bode}}\\
+\vspace{0.2cm}
+\textbf{Magnitud, fase, pendientes y respuesta senoidal}
+\end{center}
+
+\begin{multicols}{2}
+
+% ============================
+\section*{1. Sustitución en frecuencia}
+
+Para analizar una función de transferencia en frecuencia:
+\[
+s = j\omega
+\]
+Entonces:
+\[
+G(s) \rightarrow G(j\omega)
+\]
+Ejemplo:
+\[
+G(s)=\frac{1}{s}
+\]
+\[
+G(j\omega)=\frac{1}{j\omega}
+\]
+
+% ============================
+\section*{2. Números complejos}
+
+Un número complejo tiene forma:
+\[
+z=a+jb
+\]
+
+\subsection*{Magnitud}
+\[
+|z|=\sqrt{a^2+b^2}
+\]
+Ejemplos:
+\[
+|1+j\omega|=\sqrt{1+\omega^2}
+\]
+\[
+|5+j\omega|=\sqrt{25+\omega^2}
+\]
+\[
+|j\omega|=\omega
+\]
+
+\subsection*{Fase}
+\[
+\angle z=\tan^{-1}\!\left(\frac{b}{a}\right)
+\]
+Ejemplos:
+\[
+\angle(1+j\omega)=\tan^{-1}(\omega)
+\]
+\[
+\angle(5+j\omega)=\tan^{-1}\!\left(\frac{\omega}{5}\right)
+\]
+\[
+\angle(j\omega)=90^\circ
+\]
+\[
+\angle(-j\omega)=-90^\circ
+\]
+
+\subsection*{Conjugado}
+
+Si $z=a+jb$, su conjugado es $\overline{z}=a-jb$.
+
+Para dividir complejos:
+\[
+\frac{a+jb}{c+jd}\cdot\frac{c-jd}{c-jd}
+\]
+Propiedad importante:
+\[
+(c+jd)(c-jd)=c^2+d^2
+\]
+
+% ============================
+\section*{3. Magnitud de una función}
+
+Si:
+\[
+G(j\omega)=\frac{A(j\omega)}{B(j\omega)}
+\]
+entonces:
+\[
+|G(j\omega)|=\frac{|A(j\omega)|}{|B(j\omega)|}
+\]
+Si hay multiplicaciones:
+\[
+|ABC|=|A||B||C|
+\]
+Ejemplo:
+\[
+G(s)=\frac{2(s+1)}{s(s+5)}
+\]
+\[
+G(j\omega)=\frac{2(1+j\omega)}{j\omega(5+j\omega)}
+\]
+\[
+|G(j\omega)|=\frac{2|1+j\omega|}{|j\omega||5+j\omega|}
+\]
+\[
+|G(j\omega)|=\frac{2\sqrt{1+\omega^2}}{\omega\sqrt{25+\omega^2}}
+\]
+
+% ============================
+\section*{4. Fase de una función}
+
+Reglas:
+\[
+\angle(AB)=\angle A+\angle B
+\]
+\[
+\angle\!\left(\frac{A}{B}\right)=\angle A-\angle B
+\]
+Si:
+\[
+G(j\omega)=\frac{2(1+j\omega)}{j\omega(5+j\omega)}
+\]
+entonces:
+\[
+\angle G(j\omega)=\angle 2+\angle(1+j\omega)-\angle(j\omega)-\angle(5+j\omega)
+\]
+Como $\angle 2=0^\circ$, $\angle(j\omega)=90^\circ$:
+\[
+\angle G(j\omega)=\tan^{-1}(\omega)-90^\circ-\tan^{-1}\!\left(\frac{\omega}{5}\right)
+\]
+
+% ============================
+\section*{5. Decibeles}
+
+La magnitud en decibeles es:
+\[
+|G(j\omega)|_{\mathrm{dB}}=20\log_{10}|G(j\omega)|
+\]
+Reglas útiles:
+\[
+20\log_{10}(AB)=20\log_{10}(A)+20\log_{10}(B)
+\]
+\[
+20\log_{10}\!\left(\frac{A}{B}\right)=20\log_{10}(A)-20\log_{10}(B)
+\]
+\[
+20\log_{10}(10)=20 \qquad 20\log_{10}(0.1)=-20
+\]
+
+% ============================
+\section*{6. Forma estándar de Bode}
+
+La forma estándar busca escribir factores así:
+\[
+1+\frac{s}{a}
+\]
+Ejemplos:
+\[
+s+10=10\!\left(1+\frac{s}{10}\right), \quad s+2=2\!\left(1+\frac{s}{2}\right)
+\]
+\[
+s+25=25\!\left(1+\frac{s}{25}\right), \quad s+40=40\!\left(1+\frac{s}{40}\right)
+\]
+La función queda como:
+\[
+G(s)=K\,s^n\,\frac{\text{ceros normalizados}}{\text{polos normalizados}}
+\]
+La ganancia pura es:
+\[
+K=\frac{\text{constantes del numerador}}{\text{constantes del denominador}}
+\]
+Ejemplo:
+\[
+G(s)=\frac{20s(s+10)}{(s+2)(s+25)(s+40)}
+\]
+\[
+K=\frac{20(10)}{2(25)(40)}=\frac{200}{2000}=0.1
+\]
+
+% ============================
+\section*{7. Frecuencias de quiebre}
+
+Un factor $s+a$ o $1+s/a$ produce una frecuencia de quiebre en $\omega=a$.
+
+Ejemplos:
+\[
+s+2 \Rightarrow \omega=2, \quad s+10 \Rightarrow \omega=10
+\]
+\[
+s+25 \Rightarrow \omega=25, \quad s+40 \Rightarrow \omega=40
+\]
+Si aparece $(s+1)^2$, la frecuencia de quiebre es $\omega=1$ pero cuenta como dos polos o dos ceros.
+
+% ============================
+\section*{8. Pendientes en Bode de magnitud}
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+Elemento & Cambio de pendiente \\
+\midrule
+Cero & $+20$ dB/dec \\
+Polo & $-20$ dB/dec \\
+Cero en el origen & $+20$ dB/dec desde el inicio \\
+Polo en el origen & $-20$ dB/dec desde el inicio \\
+Cero doble & $+40$ dB/dec \\
+Polo doble & $-40$ dB/dec \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Regla rápida:
+\[
+s^n \text{ arriba} \Rightarrow +20n\ \text{dB/dec}
+\]
+\[
+s^n \text{ abajo} \Rightarrow -20n\ \text{dB/dec}
+\]
+
+% ============================
+\section*{9. Actualizar anclajes de magnitud}
+
+Si ya conoces la magnitud en $\omega_1$, puedes calcularla en $\omega_2$ con:
+\[
+|G(j\omega_2)|_{\mathrm{dB}}=|G(j\omega_1)|_{\mathrm{dB}}+m\log_{10}\!\left(\frac{\omega_2}{\omega_1}\right)
+\]
+donde $m$ es la pendiente en dB/dec.
+
+Ejemplo: $|G(j40)|=-6\ \text{dB}$, pendiente $m=-20$, para $\omega=100$:
+\[
+|G(j100)|_{\mathrm{dB}}=-6-20\log_{10}\!\left(\frac{100}{40}\right)=-6-20\log_{10}(2.5)\approx -14\ \text{dB}
+\]
+
+% ============================
+\section*{10. Anclaje inicial}
+
+Si no hay polos ni ceros en el origen:
+\[
+|G(j\omega)|_{\mathrm{dB}}\approx 20\log_{10}|K|
+\]
+Si hay un cero en el origen:
+\[
+|G(j\omega)|_{\mathrm{dB}}\approx 20\log_{10}|K|+20\log_{10}(\omega)
+\]
+Si hay un polo en el origen:
+\[
+|G(j\omega)|_{\mathrm{dB}}\approx 20\log_{10}|K|-20\log_{10}(\omega)
+\]
+Más general:
+\[
+|G(j\omega)|_{\mathrm{dB}}\approx 20\log_{10}|K|+20n\log_{10}(\omega)
+\]
+donde $n>0$ indica ceros en el origen y $n<0$ polos en el origen.
+
+% ============================
+\section*{11. Fase aproximada por asíntotas}
+
+Reglas básicas:
+\[
+\text{cero} \Rightarrow +90^\circ \qquad \text{polo} \Rightarrow -90^\circ
+\]
+\[
+s\ \text{arriba} \Rightarrow +90^\circ \qquad s\ \text{abajo} \Rightarrow -90^\circ
+\]
+Ejemplo con $G(s)=\dfrac{20s(s+10)}{(s+2)(s+25)(s+40)}$:
+
+Contribuciones: $s\!:+90^\circ$,\ $(s+10)\!:+90^\circ$,\ $(s+2)\!:-90^\circ$,\ $(s+25)\!:-90^\circ$,\ $(s+40)\!:-90^\circ$.
+
+Fase por intervalos:
+\[
+90^\circ,\ 0^\circ,\ 90^\circ,\ 0^\circ,\ -90^\circ
+\]
+
+% ============================
+\section*{12. Fase exacta}
+
+Para un factor de cero $\left(1+\dfrac{j\omega}{a}\right)$:
+\[
++\tan^{-1}\!\left(\frac{\omega}{a}\right)
+\]
+Para un factor de polo $\dfrac{1}{1+j\omega/a}$:
+\[
+-\tan^{-1}\!\left(\frac{\omega}{a}\right)
+\]
+Para cero en el origen $j\omega$: $\angle(j\omega)=+90^\circ$.
+
+Para polo en el origen $\dfrac{1}{j\omega}$: $\angle\!\left(\dfrac{1}{j\omega}\right)=-90^\circ$.
+
+% ============================
+\section*{13. Respuesta senoidal en estado estable}
+
+Si la entrada es $x(t)=A\cos(\omega t+\phi)$, la salida es:
+\[
+y(t)=A|G(j\omega)|\cos\!\left(\omega t+\phi+\angle G(j\omega)\right)
+\]
+Reglas:
+\[
+\text{amplitud de salida}=A|G(j\omega)|
+\]
+\[
+\text{fase de salida}=\phi+\angle G(j\omega)
+\]
+La frecuencia no cambia.
+
+% ============================
+\section*{14. Convertir seno a coseno}
+
+Identidades importantes:
+\[
+\sin(\theta)=\cos(\theta-90^\circ)
+\]
+\[
+\cos(\theta)=\sin(\theta+90^\circ)
+\]
+\[
+\cos(\theta-180^\circ)=-\cos(\theta)
+\]
+\[
+\sin(\theta-90^\circ)=-\cos(\theta)
+\]
+Ejemplo:
+\[
+4\sin(\omega t)=4\cos(\omega t-90^\circ)
+\]
+
+% ============================
+\section*{15. Combinar coseno y seno}
+
+Si tienes $x(t)=a\cos(\omega t)+b\sin(\omega t)$, puedes escribirlo como:
+\[
+x(t)=R\cos(\omega t-\alpha)
+\]
+donde:
+\[
+R=\sqrt{a^2+b^2}, \qquad \alpha=\tan^{-1}\!\left(\frac{b}{a}\right)
+\]
+porque $R\cos(\omega t-\alpha)=R\cos(\omega t)\cos\alpha+R\sin(\omega t)\sin\alpha$,
+
+entonces $a=R\cos\alpha$ y $b=R\sin\alpha$.
+
+Ejemplo: $3\cos(5t)+4\sin(5t)$
+\[
+R=\sqrt{3^2+4^2}=5, \qquad \alpha=\tan^{-1}\!\left(\frac{4}{3}\right)=53.13^\circ
+\]
+\[
+x(t)=5\cos(5t-53.13^\circ)
+\]
+
+% ============================
+\section*{16. Checklist para resolver}
+
+\begin{enumerate}
+\item Sustituir $s=j\omega$.
+\item Identificar polos, ceros y ganancia $K$.
+\item Normalizar factores: $s+a=a(1+s/a)$.
+\item Encontrar frecuencias de quiebre.
+\item Para magnitud:
+\[
+|G(j\omega)|=\frac{\text{magnitudes de arriba}}{\text{magnitudes de abajo}}
+\]
+\item Para fase:
+\[
+\angle G = \text{fases de arriba} - \text{fases de abajo}
+\]
+\item Para Bode: sumar $+20$ por cero y $-20$ por polo.
+\item Para salida senoidal: multiplicar amplitud y sumar fase.
+\end{enumerate}
+
+\end{multicols}
+
+\end{document}
